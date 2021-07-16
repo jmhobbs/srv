@@ -2,18 +2,19 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"time"
 )
 
-func LoggingMiddleware(logger *Logger, next http.Handler) http.Handler {
+func LoggingMiddleware(logger io.Writer, next http.Handler) http.Handler {
 	return http.HandlerFunc(func (w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		w2 := &loggingResponseWriter{w, 0, 200}
 		next.ServeHTTP(w2, r)
 		elapsed := time.Since(start)
-		logger.Info("%d %v %v (%v) %s", w2.code, r.Method, r.URL, elapsed, w2.Written())
+		fmt.Fprintf(logger, "%d %v %v (%v) %s\n", w2.code, r.Method, r.URL, elapsed, w2.Written())
 	})
 }
 

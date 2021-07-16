@@ -9,6 +9,8 @@ This server is not meant to be a production web server, just for quick little te
 ```
 usage: srv [options] [directory]
 
+  -access-log string
+    	Where to write access logs, default is STDOUT. Pass empty string to disable. (default "-")
   -interface string
     	Network interface to listen on (default "127.0.0.1")
   -p int

@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -18,6 +19,7 @@ func main () {
 		quiet *bool = flag.Bool("q", false, "Quiet mode, disable most logging")
 		verbose *bool = flag.Bool("v", false, "Verbose mode, enable debug logging")
 		showVersion *bool = flag.Bool("version", false, "Show version and exit")
+		accessLogs *string = flag.String("access-log", "-", "Where to write access logs, default is STDOUT. Pass empty string to disable.")
 	)
 	flag.Usage = func ()  {
 		fmt.Fprint(flag.CommandLine.Output(), "usage: srv [options] [directory]\n\n")
@@ -55,18 +57,29 @@ func main () {
 
 	addr := fmt.Sprintf("%s:%d", *iface, *port)
 
-	fmt.Printf("Listening on %s...\n", addr)
-
 	var handler http.Handler = newHandler(logger, absDir)
-	if ! *quiet {
-		handler = LoggingMiddleware(logger, handler)
+	if *accessLogs != "" {
+		var sink io.Writer
+		if *accessLogs == "-" {
+			sink = os.Stdout
+		} else {
+			f, err := os.OpenFile(*accessLogs, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			if err != nil {
+				logger.Error("Error opening access log: %v", err)
+				os.Exit(1)
+			}
+			defer f.Close()
+			sink = f
+		}
+		handler = LoggingMiddleware(sink, handler)
 	}
 
+	logger.Info("Listening on %s...", addr)
 	err = http.ListenAndServe(addr, handler)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v", err)
+		logger.Error("Error serving: %v", err)
 		os.Exit(1)
 	}
 
-	fmt.Println("Goodbye.")
+	logger.Info("Goodbye")
 }
