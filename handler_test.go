@@ -18,3 +18,33 @@ func TestFindParentPath(t *testing.T) {
 		}
 	}
 }
+
+func TestDetectContentType(t *testing.T) {
+	tests := map[string]*string {
+		"vendor.min.css": strPtr("text/css"),
+		"path/isnt/important.9284af2.js": strPtr("application/javascript"),
+		"you-dont-know-me.txt": nil,
+	}
+
+	for input, expected := range tests {
+		actual := detectContentType(input)
+		if actual == nil && expected != nil {
+			t.Errorf("output did not match expected for %q\n  actual: %v\nexpected: %q", input, actual, *expected)
+			continue
+		}
+		if actual != nil && expected == nil {
+			t.Errorf("output did not match expected for %q\n  actual: %q\nexpected: %v", input, *actual, expected)
+			continue
+		}
+		if actual == nil && expected == nil {
+			continue
+		}
+		if *actual != *expected {
+			t.Errorf("output did not match expected for %q\n  actual: %q\nexpected: %q", input, *actual, *expected)
+		}
+	}
+}
+
+func strPtr(str string) *string {
+	return &str
+}

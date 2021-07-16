@@ -20,7 +20,7 @@ func main () {
 		showVersion *bool = flag.Bool("version", false, "Show version and exit")
 	)
 	flag.Usage = func ()  {
-		fmt.Fprintln(flag.CommandLine.Output(), "usage: srv [options] [directory]\n")
+		fmt.Fprint(flag.CommandLine.Output(), "usage: srv [options] [directory]\n\n")
 		flag.PrintDefaults()
 	}
 	flag.Parse()

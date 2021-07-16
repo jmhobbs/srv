@@ -1,10 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -64,10 +66,14 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	defer f.Close()
 
+	if contentType := detectContentType(abs); contentType != nil {
+		w.Header().Set("content-type", *contentType)
+	}
+
 	// todo: etags
 	_, err = io.Copy(w, f)
 	if err != nil {
-		h.logger.Error("error copyinf file %q: %v", clean, err)
+		h.logger.Error("error copying file %q: %v", clean, err)
 		w.WriteHeader(500)
 		w.Write([]byte("Internal Server Error"))
 		return
@@ -84,6 +90,7 @@ type directoryListingEntry struct {
 	Name string
 	Path string
 	IsDir bool
+	Size string
 } 
 
 func newDirectoryListing(path string, dirents []os.DirEntry) directoryListing {
@@ -99,10 +106,17 @@ func newDirectoryListing(path string, dirents []os.DirEntry) directoryListing {
 	}
 
 	for _, ent := range dirents {
+		finfo, err := ent.Info()
+		if err != nil {
+			// todo: log or handle
+			continue
+		}
+
 		listing.Entries = append(listing.Entries, directoryListingEntry{
 			Name: ent.Name(),
 			Path: strings.Join([]string{prefix, ent.Name()}, "/"),
 			IsDir: ent.IsDir(),
+			Size: humanize(finfo.Size()),
 		})
 	}
 	return listing
@@ -118,4 +132,42 @@ func findParentPath(path string) string {
 		return "/"
 	}
 	return strings.Join(segments[:len(segments)-1], "/")
+}
+
+func humanize(size int64) string {
+	if(size < 1024) {
+		return strconv.FormatInt(size, 10)
+	}
+	fsize := float64(size)
+	if(size < 1048576) {
+		return fmt.Sprintf("%0.2f kb", fsize / 1024.0)
+	}
+	if(size < 1073741824) {
+		return fmt.Sprintf("%0.2f mb", fsize / 1048576.0)
+	}
+	return fmt.Sprintf("%0.2f gb", fsize / 1073741824.0)
+}
+
+func detectContentType(path string) *string {
+	i := strings.LastIndexByte(path, '.')
+	if i == -1 {
+		return nil
+	}
+
+	suffix := path[i+1:]
+
+	if contentType, ok := knownContentTypes[suffix]; ok {
+		return &contentType
+	}
+
+	return nil
+}
+
+var knownContentTypes map[string]string
+
+func init () {
+	knownContentTypes = map[string]string{
+		"css": "text/css",
+		"js": "application/javascript",
+	}
 }
