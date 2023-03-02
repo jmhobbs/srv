@@ -11,10 +11,12 @@ usage: srv [options] [directory]
 
   -access-log string
     	Where to write access logs, default is STDOUT. Pass empty string to disable. (default "-")
+  -default-dir-files string
+    	Default files to show for directory, when present. (default "index.html,index.htm")
   -interface string
     	Network interface to listen on (default "127.0.0.1")
   -p int
-    	Port to listen on (default 5000)
+    	Port to listen on (default 5050)
   -q	Quiet mode, disable most logging
   -v	Verbose mode, enable debug logging
   -version

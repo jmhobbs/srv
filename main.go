@@ -7,21 +7,23 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
 )
 
-const VERSION string = "0.0.1"
+const VERSION string = "0.0.3"
 
-func main () {
+func main() {
 	var (
-		port *int = flag.Int("p", 5000, "Port to listen on")
-		iface *string = flag.String("interface", "127.0.0.1", "Network interface to listen on")
-		quiet *bool = flag.Bool("q", false, "Quiet mode, disable most logging")
-		verbose *bool = flag.Bool("v", false, "Verbose mode, enable debug logging")
-		showVersion *bool = flag.Bool("version", false, "Show version and exit")
-		accessLogs *string = flag.String("access-log", "-", "Where to write access logs, default is STDOUT. Pass empty string to disable.")
+		port                  *int    = flag.Int("p", 5050, "Port to listen on")
+		iface                 *string = flag.String("interface", "127.0.0.1", "Network interface to listen on")
+		quiet                 *bool   = flag.Bool("q", false, "Quiet mode, disable most logging")
+		verbose               *bool   = flag.Bool("v", false, "Verbose mode, enable debug logging")
+		showVersion           *bool   = flag.Bool("version", false, "Show version and exit")
+		accessLogs            *string = flag.String("access-log", "-", "Where to write access logs, default is STDOUT. Pass empty string to disable.")
+		defaultDirectoryFiles *string = flag.String("default-dir-files", "index.html,index.htm", "Default files to show for directory, when present.")
 	)
-	flag.Usage = func ()  {
+	flag.Usage = func() {
 		fmt.Fprint(flag.CommandLine.Output(), "usage: srv [options] [directory]\n\n")
 		flag.PrintDefaults()
 	}
@@ -57,7 +59,7 @@ func main () {
 
 	addr := fmt.Sprintf("%s:%d", *iface, *port)
 
-	var handler http.Handler = newHandler(logger, absDir)
+	var handler http.Handler = newHandler(logger, absDir, strings.Split(*defaultDirectoryFiles, ","))
 	if *accessLogs != "" {
 		var sink io.Writer
 		if *accessLogs == "-" {

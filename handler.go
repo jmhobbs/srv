@@ -11,12 +11,13 @@ import (
 )
 
 type Handler struct {
-  root string
-	logger *Logger
+	root                  string
+	logger                *Logger
+	defaultDirectoryFiles []string
 }
 
-func newHandler(logger *Logger, dir string) *Handler {
-	return &Handler{dir, logger}
+func newHandler(logger *Logger, dir string, defaultDirectoryFiles []string) *Handler {
+	return &Handler{dir, logger, defaultDirectoryFiles}
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -39,6 +40,15 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if finfo.IsDir() {
+		for _, defaultFile := range h.defaultDirectoryFiles {
+			f, err := os.Open(filepath.Join(abs, defaultFile))
+			if err == nil {
+				defer f.Close()
+				h.writeFile(w, f, abs, clean)
+				return
+			}
+		}
+
 		dirents, err := os.ReadDir(abs)
 		if err != nil {
 			h.logger.Error("error reading directory %q: %v", clean, err)
@@ -66,12 +76,15 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	defer f.Close()
 
+	h.writeFile(w, f, abs, clean)
+}
+
+func (h *Handler) writeFile(w http.ResponseWriter, f io.Reader, abs, clean string) {
 	if contentType := detectContentType(abs); contentType != nil {
 		w.Header().Set("content-type", *contentType)
 	}
 
-	// todo: etags
-	_, err = io.Copy(w, f)
+	_, err := io.Copy(w, f)
 	if err != nil {
 		h.logger.Error("error copying file %q: %v", clean, err)
 		w.WriteHeader(500)
@@ -81,22 +94,22 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type directoryListing struct {
-	Path string
-	Parent string
+	Path    string
+	Parent  string
 	Entries []directoryListingEntry
 }
 
 type directoryListingEntry struct {
-	Name string
-	Path string
+	Name  string
+	Path  string
 	IsDir bool
-	Size string
-} 
+	Size  string
+}
 
 func newDirectoryListing(path string, dirents []os.DirEntry) directoryListing {
 	listing := directoryListing{
-		Path: path,
-		Parent: findParentPath(path),
+		Path:    path,
+		Parent:  findParentPath(path),
 		Entries: []directoryListingEntry{},
 	}
 
@@ -113,10 +126,10 @@ func newDirectoryListing(path string, dirents []os.DirEntry) directoryListing {
 		}
 
 		listing.Entries = append(listing.Entries, directoryListingEntry{
-			Name: ent.Name(),
-			Path: strings.Join([]string{prefix, ent.Name()}, "/"),
+			Name:  ent.Name(),
+			Path:  strings.Join([]string{prefix, ent.Name()}, "/"),
 			IsDir: ent.IsDir(),
-			Size: humanize(finfo.Size()),
+			Size:  humanize(finfo.Size()),
 		})
 	}
 	return listing
@@ -135,17 +148,17 @@ func findParentPath(path string) string {
 }
 
 func humanize(size int64) string {
-	if(size < 1024) {
+	if size < 1024 {
 		return strconv.FormatInt(size, 10)
 	}
 	fsize := float64(size)
-	if(size < 1048576) {
-		return fmt.Sprintf("%0.2f kb", fsize / 1024.0)
+	if size < 1048576 {
+		return fmt.Sprintf("%0.2f kb", fsize/1024.0)
 	}
-	if(size < 1073741824) {
-		return fmt.Sprintf("%0.2f mb", fsize / 1048576.0)
+	if size < 1073741824 {
+		return fmt.Sprintf("%0.2f mb", fsize/1048576.0)
 	}
-	return fmt.Sprintf("%0.2f gb", fsize / 1073741824.0)
+	return fmt.Sprintf("%0.2f gb", fsize/1073741824.0)
 }
 
 func detectContentType(path string) *string {
@@ -165,9 +178,10 @@ func detectContentType(path string) *string {
 
 var knownContentTypes map[string]string
 
-func init () {
+func init() {
 	knownContentTypes = map[string]string{
 		"css": "text/css",
-		"js": "application/javascript",
+		"js":  "application/javascript",
+		"svg": "image/svg+xml",
 	}
 }
