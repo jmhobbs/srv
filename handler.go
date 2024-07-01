@@ -14,10 +14,11 @@ type Handler struct {
 	root                  string
 	logger                *Logger
 	defaultDirectoryFiles []string
+	fileServer            http.Handler
 }
 
 func newHandler(logger *Logger, dir string, defaultDirectoryFiles []string) *Handler {
-	return &Handler{dir, logger, defaultDirectoryFiles}
+	return &Handler{dir, logger, defaultDirectoryFiles, http.FileServer(http.Dir(dir))}
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -67,16 +68,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	f, err := os.Open(abs)
-	if err != nil {
-		h.logger.Error("error opening file %q: %v", clean, err)
-		w.WriteHeader(500)
-		w.Write([]byte("Internal Server Error"))
-		return
+	if contentType := detectContentType(abs); contentType != nil {
+		w.Header().Set("content-type", *contentType)
 	}
-	defer f.Close()
 
-	h.writeFile(w, f, abs, clean)
+	h.fileServer.ServeHTTP(w, r)
 }
 
 func (h *Handler) writeFile(w http.ResponseWriter, f io.Reader, abs, clean string) {
