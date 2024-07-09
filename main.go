@@ -11,7 +11,7 @@ import (
 	"syscall"
 )
 
-const VERSION string = "0.0.3"
+const VERSION string = "0.0.4"
 
 func main() {
 	var (
