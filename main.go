@@ -22,6 +22,7 @@ func main() {
 		showVersion           *bool   = flag.Bool("version", false, "Show version and exit")
 		accessLogs            *string = flag.String("access-log", "-", "Where to write access logs, default is STDOUT. Pass empty string to disable.")
 		defaultDirectoryFiles *string = flag.String("default-dir-files", "index.html,index.htm", "Default files to show for directory, when present.")
+		headersFile           *string = flag.String("headers-file", "_headers", "Path to _headers file to apply.")
 	)
 	flag.Usage = func() {
 		fmt.Fprint(flag.CommandLine.Output(), "usage: srv [options] [directory]\n\n")
@@ -57,9 +58,19 @@ func main() {
 		os.Exit(1)
 	}
 
+	headers, err := loadHeadersFile(*headersFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			logger.Warn("No headers file found at %q", *headersFile)
+		} else {
+			logger.Error("Error loading headers file: %v", err)
+			os.Exit(1)
+		}
+	}
+
 	addr := fmt.Sprintf("%s:%d", *iface, *port)
 
-	var handler http.Handler = newHandler(logger, absDir, strings.Split(*defaultDirectoryFiles, ","))
+	var handler http.Handler = newHandler(logger, absDir, strings.Split(*defaultDirectoryFiles, ","), headers)
 	if *accessLogs != "" {
 		var sink io.Writer
 		if *accessLogs == "-" {

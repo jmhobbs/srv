@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	headers "github.com/jmhobbs/cloudflare-headers-file"
 )
 
 type Handler struct {
@@ -15,10 +17,11 @@ type Handler struct {
 	logger                *Logger
 	defaultDirectoryFiles []string
 	fileServer            http.Handler
+	headers               *headers.File
 }
 
-func newHandler(logger *Logger, dir string, defaultDirectoryFiles []string) *Handler {
-	return &Handler{dir, logger, defaultDirectoryFiles, http.FileServer(http.Dir(dir))}
+func newHandler(logger *Logger, dir string, defaultDirectoryFiles []string, headers *headers.File) *Handler {
+	return &Handler{dir, logger, defaultDirectoryFiles, http.FileServer(http.Dir(dir)), headers}
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -27,6 +30,16 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if clean != r.URL.Path {
 		http.Redirect(w, r, clean, 301)
 		return
+	}
+
+	if h.headers != nil {
+		headersToSet := h.headers.Match(*r.URL)
+		for _, header := range headersToSet {
+			split := strings.SplitN(header, ":", 2)
+			if len(split) == 2 {
+				w.Header().Add(split[0], split[1])
+			}
+		}
 	}
 
 	abs := filepath.Join(h.root, clean)
