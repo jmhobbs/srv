@@ -24,14 +24,7 @@ func newHandler(logger *Logger, dir string, defaultDirectoryFiles []string, head
 	return &Handler{dir, logger, defaultDirectoryFiles, http.FileServer(http.Dir(dir)), headers}
 }
 
-func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	clean := filepath.Clean(r.URL.Path)
-
-	if clean != r.URL.Path {
-		http.Redirect(w, r, clean, 301)
-		return
-	}
-
+func (h *Handler) SetHeaders(w http.ResponseWriter, r *http.Request) {
 	if h.headers != nil {
 		headersToSet := h.headers.Match(*r.URL)
 		for _, header := range headersToSet {
@@ -41,43 +34,61 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+}
 
-	abs := filepath.Join(h.root, clean)
-	finfo, err := os.Stat(abs) // todo: stat cache?
-	if err != nil {
-		if os.IsNotExist(err) {
-			// 404
-			w.WriteHeader(404)
-			w.Write([]byte("Not Found"))
+func (h *Handler) DirectoryListing(w http.ResponseWriter, clean, abs string) {
+	for _, defaultFile := range h.defaultDirectoryFiles {
+		f, err := os.Open(filepath.Join(abs, defaultFile))
+		if err == nil {
+			defer func() {
+				if err := f.Close(); err != nil {
+					h.logger.Error("error closing file %q: %v", defaultFile, err)
+				}
+			}()
+			h.writeFile(w, f, abs, clean)
 			return
 		}
 	}
 
+	dirents, err := os.ReadDir(abs)
+	if err != nil {
+		h.logger.Error("error reading directory %q: %v", clean, err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	err = Template.ExecuteTemplate(w, "index", newDirectoryListing(clean, dirents))
+	if err != nil {
+		h.logger.Error("error rendering directory listing %q: %v", clean, err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+}
+
+func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	clean := filepath.Clean(r.URL.Path)
+
+	if clean != r.URL.Path {
+		http.Redirect(w, r, clean, http.StatusMovedPermanently)
+		return
+	}
+
+	h.SetHeaders(w, r)
+
+	abs := filepath.Join(h.root, clean)
+	finfo, err := os.Stat(abs)
+	if err != nil {
+		if os.IsNotExist(err) {
+			http.NotFound(w, r)
+			return
+		}
+		h.logger.Error("error: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
 	if finfo.IsDir() {
-		for _, defaultFile := range h.defaultDirectoryFiles {
-			f, err := os.Open(filepath.Join(abs, defaultFile))
-			if err == nil {
-				defer f.Close()
-				h.writeFile(w, f, abs, clean)
-				return
-			}
-		}
-
-		dirents, err := os.ReadDir(abs)
-		if err != nil {
-			h.logger.Error("error reading directory %q: %v", clean, err)
-			w.WriteHeader(500)
-			w.Write([]byte("Internal Server Error"))
-			return
-		}
-
-		err = Template.ExecuteTemplate(w, "index", newDirectoryListing(clean, dirents))
-		if err != nil {
-			h.logger.Error("error rendering directory listing %q: %v", clean, err)
-			w.WriteHeader(500)
-			w.Write([]byte("Internal Server Error"))
-			return
-		}
+		h.DirectoryListing(w, clean, abs)
 		return
 	}
 
@@ -96,8 +107,7 @@ func (h *Handler) writeFile(w http.ResponseWriter, f io.Reader, abs, clean strin
 	_, err := io.Copy(w, f)
 	if err != nil {
 		h.logger.Error("error copying file %q: %v", clean, err)
-		w.WriteHeader(500)
-		w.Write([]byte("Internal Server Error"))
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 }
