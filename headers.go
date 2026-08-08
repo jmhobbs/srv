@@ -11,6 +11,7 @@ func loadHeadersFile(path string) (*headers.File, error) {
 	if err != nil {
 		return nil, err
 	}
+	//nolint:errcheck
 	defer f.Close()
 
 	return headers.Parse(f)
