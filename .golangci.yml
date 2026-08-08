@@ -1,0 +1,23 @@
+version: "2"
+linters:
+  enable:
+    - cyclop
+    - exhaustive
+    - forcetypeassert
+    - goconst
+    - prealloc
+    - testifylint
+  settings:
+    errcheck:
+      exclude-functions:
+        - fmt.Fprintf
+        - fmt.Fprint
+        - fmt.Fprintln
+        - fmt.Printf
+        - fmt.Print
+        - fmt.Println
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - goconst
