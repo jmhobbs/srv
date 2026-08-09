@@ -1,12 +1,11 @@
-package main
+package handler
 
 import "html/template"
 
 var Template *template.Template
 
-
-func init () {
-  Template = template.Must(template.New("index").Parse(`<!doctype html>
+func init() {
+	Template = template.Must(template.New("index").Parse(`<!doctype html>
 <html lang="en">
   <head>
     <title>{{.Path}}</title>
@@ -77,3 +76,4 @@ func init () {
 </html>
 `))
 }
+
