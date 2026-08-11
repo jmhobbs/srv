@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 	"time"
+
+	"github.com/jmhobbs/srv/internal/humanize"
 )
 
 func LoggingMiddleware(logger io.Writer, next http.Handler) http.Handler {
@@ -40,15 +41,5 @@ func (s *loggingResponseWriter) WriteHeader(code int) {
 }
 
 func (s *loggingResponseWriter) Written() string {
-	if s.written > 1073741824 {
-		return fmt.Sprintf("%0.2f gb", float64(s.written/1073741824))
-	}
-	if s.written > 1048576 {
-		return fmt.Sprintf("%0.2f mb", float64(s.written/1048576))
-	}
-	if s.written > 1024 {
-		return fmt.Sprintf("%0.2f kb", float64(s.written/1024))
-	}
-	return strconv.Itoa(s.written) + " b"
+	return humanize.Bytes(int64(s.written))
 }
-
