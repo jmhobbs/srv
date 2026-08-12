@@ -1,5 +1,6 @@
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
 # vim: set ts=2 sw=2 tw=0 fo=cnqoj
+
 version: 2
 
 before:
@@ -7,24 +8,33 @@ before:
     - go mod tidy
 
 builds:
-  - id: srv
+  - main: .
     binary: srv
-    ldflags:
-      - -X "main.version={{.Env.VERSION}}"
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
     goarch:
-     - amd64
-     - arm64
+      - arm64
+      - amd64
+      - "386"
 
 archives:
-  - formats: ["tar.gz"]
+  - formats: [tar.gz]
+    # this name template makes the OS and Arch compatible with the results of `uname`.
     name_template: >-
       {{ .ProjectName }}_
-      {{- .Os }}_
-      {{- .Arch}}
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
     # use zip for windows archives
     format_overrides:
-    - goos: windows
-      formats: ["zip"]
+      - goos: windows
+        formats: [zip]
 
 changelog:
   sort: asc
@@ -34,7 +44,8 @@ changelog:
       - "^test:"
 
 release:
-  name_template: "{{ .Env.VERSION }}"
+  footer: >-
 
-checksum:
-  name_template: 'checksums.txt'
+    ---
+
+    Released by [GoReleaser](https://github.com/goreleaser/goreleaser).
